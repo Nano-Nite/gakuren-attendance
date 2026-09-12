@@ -1,0 +1,41 @@
+services:
+  attendance-mgmt:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=gakuren-network"
+      - "traefik.http.routers.attendance-mgmt.rule=Host(`api.gakuren.web.id`) && PathPrefix(`/v1/attendance`)"
+      - "traefik.http.routers.attendance-mgmt.entrypoints=websecure"
+      - "traefik.http.routers.attendance-mgmt.tls=true"
+      - "traefik.http.routers.attendance-mgmt.tls.certresolver=letsencrypt"
+      - "traefik.http.services.attendance-mgmt.loadbalancer.server.port=3000"
+    expose:
+      - "3000"
+    environment:
+      PORT: ${PORT}
+      API_VERSION: ${API_VERSION}
+      FE_ALLOWED_ORIGINS: ${FE_ALLOWED_ORIGINS:-}
+      REFRESH_COOKIE_SAME_SITE: ${REFRESH_COOKIE_SAME_SITE:-lax}
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_AUDIENCE: ${JWT_AUDIENCE}
+      JWT_KEY_ID: ${JWT_KEY_ID}
+      ACCESS_TOKEN_DURATION: ${ACCESS_TOKEN_DURATION}
+      REFRESH_TOKEN_DURATION: ${REFRESH_TOKEN_DURATION}
+      JWT_REFRESH_SECURE_KEY: ${JWT_REFRESH_SECURE_KEY}
+      RSA_PUBLIC_KEY: ${RSA_PUBLIC_KEY}
+      RSA_PRIVATE_KEY: ${RSA_PRIVATE_KEY}
+      RSA_PASSPHARSE: ${RSA_PASSPHARSE}
+      DATABASE_USERNAME: ${DATABASE_USERNAME}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_NAME: ${DATABASE_NAME}
+      DATABASE_URL: ${DATABASE_URL}
+    networks:
+      gakuren-network:
+        aliases:
+          - attendance-mgmt
+
+networks:
+  gakuren-network:
+    external: true
