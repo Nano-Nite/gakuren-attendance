@@ -7,10 +7,13 @@ import (
 
 	"gakuren-system.com/pkg/helper"
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/cors"
 )
 
 func SetupRoutes() {
 	app := fiber.New()
+
+	app.Use(cors.New())
 
 	app.Use(func(c fiber.Ctx) error {
 		log.Printf("API hit : %s %s <> IP Address : %s <> User Agent : %s\n", c.Method(), c.OriginalURL(), c.IP(), c.UserAgent())
