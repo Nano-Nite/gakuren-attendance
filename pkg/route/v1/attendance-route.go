@@ -10,9 +10,11 @@ import (
 )
 
 func SetupLocationRoutes(app *fiber.App, version string) {
-	baseURL := "/" + strings.Trim(version, "/") + "/attendance/location"
+	baseURL := "/" + strings.Trim(version, "/") + "/attendance"
 
-	app.Post(baseURL+"/create", func(c fiber.Ctx) error {
+	//* LOCATION
+	// create
+	app.Post(baseURL+"/location/create", func(c fiber.Ctx) error {
 		payload := new(attendance.CreateLocationRequest)
 
 		//* validate header
@@ -104,7 +106,7 @@ func SetupLocationRoutes(app *fiber.App, version string) {
 	})
 
 	// get detail
-	app.Get(baseURL+"/get-all", func(c fiber.Ctx) error {
+	app.Get(baseURL+"/location/get-all", func(c fiber.Ctx) error {
 		schoolUUID, tenantUUID, _, err := helper.ValidateRequestHeader(c)
 		if err != nil {
 			return helper.ReturnResponse(c, fiber.StatusUnauthorized, "Missing or invalid authentication data", nil, err)
@@ -117,4 +119,115 @@ func SetupLocationRoutes(app *fiber.App, version string) {
 		return helper.ReturnResponse(c, fiber.StatusOK, "success", result, nil)
 	})
 
+	//* SESSION
+	// create
+	app.Post(baseURL+"/sessions", func(c fiber.Ctx) error {
+		payload := new(attendance.CreateSession)
+
+		//* validate header
+		schoolUUID, tenantUUID, requesterUUID, err := helper.ValidateRequestHeader(c)
+		if err != nil {
+			return helper.ReturnResponse(c, fiber.StatusUnauthorized, "Missing or invalid authentication data", nil, err)
+		}
+
+		//* validate payload
+		if err := c.Bind().Body(payload); err != nil {
+			return helper.ReturnResponse(c, fiber.StatusBadRequest, "Missing or invalid body", nil, err)
+		}
+
+		//* permission check
+		if ok, permissionErr := helper.GetUserPermission(requesterUUID.String(), helper.QR_CODE_CREATE_PERMISSION); permissionErr != nil || !ok {
+			return helper.ReturnResponse(c, fiber.StatusUnauthorized, "Access Denied", nil, permissionErr)
+		}
+
+		//* validate existing data in db
+		if err = helper.ValidateRequestSession(*payload, schoolUUID, tenantUUID); err != nil {
+			return helper.ReturnResponse(c, fiber.StatusConflict, "Data already exist", nil, err)
+		}
+
+		createPayload := new(attendance.SessionModel{
+			TenantUUID:     tenantUUID,
+			SchoolUUID:     schoolUUID,
+			AttendanceType: payload.AttendanceType,
+			TargetType:     payload.TargetType,
+			LocatoinUUID:   payload.LocatoinUUID,
+			ValidFrom:      payload.ValidFrom,
+			ValidUntil:     payload.ValidUntil,
+			Status:         attendance.SESSION_STATUS_ACTIVE,
+			CreatedBy:      requesterUUID,
+		})
+
+		//* check if user can bypass workflow
+		canBypass, err := helper.ValidateApprovalBypass(requesterUUID)
+		if err != nil {
+			return helper.ReturnResponse(c, fiber.StatusInternalServerError, "Failed to check approval bypass", nil, err)
+		}
+		if canBypass {
+			tx, err := db.Conn.Begin(c.Context())
+			if err != nil {
+				return err
+			}
+			defer tx.Rollback(c.Context())
+
+			if err = helper.CreateSession(*createPayload, tx, c.Context()); err != nil {
+				return helper.ReturnResponse(c, fiber.StatusInternalServerError, "Failed to create location", nil, err)
+			}
+
+			tx.Commit(c.Context())
+			return helper.ReturnResponse(c, fiber.StatusOK, "success", map[string]any{"payload": payload}, nil)
+		}
+		/*
+			//* using worklow approval
+			workflow, err := helper.DetermineWorkflow(schoolUUID, tenantUUID, requesterUUID, helper.LOCATION_CREATE_PERMISSION, helper.ACTION_CODE_CREATE)
+			if err != nil {
+				return helper.ReturnResponse(c, fiber.StatusInternalServerError, "Failed to determine approval workflow", nil, err)
+			}
+
+			//* fallback when workflow didn't exist, shall we continue or not execute at all
+			if workflow == nil {
+				err = helper.ExecuteWorkflowFallback(func() error {
+					tx, err := db.Conn.Begin(c.Context())
+					if err != nil {
+						return err
+					}
+					defer tx.Rollback(c.Context())
+
+					if err = helper.CreateLocation(*createPayload, tx, c.Context()); err != nil {
+						return helper.ReturnResponse(c, fiber.StatusInternalServerError, "Failed to create location", nil, err)
+					}
+
+					return tx.Commit(c.Context())
+				})
+				if err != nil {
+					return helper.ReturnResponse(c, fiber.StatusInternalServerError, "Create rejected by workflow configuration", nil, err)
+				}
+				return helper.ReturnResponse(c, fiber.StatusOK, "success", map[string]any{"payload": payload}, nil)
+			}
+
+			//* create approval instance
+			approvalUUID, err := helper.CreateApproval(*workflow, schoolUUID, tenantUUID, requesterUUID, nil, helper.ACTION_CODE_CREATE, helper.LOCATION_ENTITY_TYPE, helper.LOCATION_MODULE_CODE, payload)
+			if err != nil {
+				return helper.ReturnResponse(c, fiber.StatusInternalServerError, "Failed to create user approval", nil, err)
+			}
+		*/
+
+		return helper.ReturnResponse(c, fiber.StatusOK, "success", map[string]any{"approval_uuid": payload.LocatoinUUID}, nil)
+	})
+
+	// active
+	app.Get(baseURL+"/sessions/active", func(c fiber.Ctx) error {
+		schoolUUID, tenantUUID, _, err := helper.ValidateRequestHeader(c)
+		if err != nil {
+			return helper.ReturnResponse(c, fiber.StatusUnauthorized, "Missing or invalid authentication data", nil, err)
+		}
+
+		result, err := helper.GetActiveSession(schoolUUID, tenantUUID)
+		if err != nil {
+			if err.Error() != "no rows in result set" {
+				return helper.ReturnResponse(c, fiber.StatusOK, "No active sessions found", nil, nil)
+			}
+			return helper.ReturnResponse(c, fiber.StatusBadRequest, "Failed to search users", nil, err)
+		}
+		return helper.ReturnResponse(c, fiber.StatusOK, "success", result, nil)
+	})
 }

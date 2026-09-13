@@ -77,6 +77,11 @@ const LOCATION_CREATE_PERMISSION = "setting.location.create"
 const LOCATION_UPDATE_PERMISSION = "setting.location.update"
 const LOCATION_DELETE_PERMISSION = "setting.location.delete"
 
+// QR CODE PERMISSION
+const QR_CODE_CREATE_PERMISSION = "qrcode.create"
+const QR_CODE_UPDATE_PERMISSION = "qrcode.update"
+const QR_CODE_DELETE_PERMISSION = "qrcode.delete"
+
 // const SUBMIT_CLASS_PERMISSION = "class.submit"
 // const APPROVE_CLASS_PERMISSION = "class.approve"
 // const REJECT_CLASS_PERMISSION = "class.reject"
