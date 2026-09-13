@@ -24,6 +24,7 @@ type SessionModel struct {
 	ValidFrom      time.Time  `json:"valid_from"`
 	ValidUntil     time.Time  `json:"valid_until"`
 	Status         string     `json:"status"`
+	QR             string     `json:"qr"`
 	CreatedBy      uuid.UUID  `json:"created_by"`
 	CreatedDate    time.Time  `json:"created_date"`
 	ClosedBy       *uuid.UUID `json:"closed_by"`
@@ -50,4 +51,16 @@ type GetActiveSessionModel struct {
 	ValidUntil     time.Time   `db:"valid_until" json:"valid_until"`
 	Location       interface{} `db:"location" json:"location"`
 	CreatedBy      interface{} `db:"created_by" json:"created_by"`
+}
+
+type QRPayload struct {
+	Type        string    `db:"type" json:"type"`
+	SessionCode string    `db:"session_code" json:"session_code"`
+	TenantUUID  uuid.UUID `db:"tenant_uuid" json:"tenant_uuid"`
+	SchoolUUID  uuid.UUID `db:"school_uuid" json:"school_uuid"`
+}
+
+type SignedQR struct {
+	Payload   string `json:"payload"`
+	Signature string `json:"signature"`
 }

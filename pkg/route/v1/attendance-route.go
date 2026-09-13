@@ -1,12 +1,14 @@
 package v1
 
 import (
+	"errors"
 	"strings"
 
 	"gakuren-system.com/pkg/db"
 	"gakuren-system.com/pkg/helper"
 	"gakuren-system.com/pkg/model/attendance"
 	"github.com/gofiber/fiber/v3"
+	"github.com/jackc/pgx/v5"
 )
 
 func SetupLocationRoutes(app *fiber.App, version string) {
@@ -169,12 +171,14 @@ func SetupLocationRoutes(app *fiber.App, version string) {
 			}
 			defer tx.Rollback(c.Context())
 
-			if err = helper.CreateSession(*createPayload, tx, c.Context()); err != nil {
-				return helper.ReturnResponse(c, fiber.StatusInternalServerError, "Failed to create location", nil, err)
+			if err = helper.CreateSession(createPayload, tx, c.Context()); err != nil {
+				return helper.ReturnResponse(c, fiber.StatusInternalServerError, "Failed to create session", nil, err)
 			}
 
-			tx.Commit(c.Context())
-			return helper.ReturnResponse(c, fiber.StatusOK, "success", map[string]any{"payload": payload}, nil)
+			if err = tx.Commit(c.Context()); err != nil {
+				return helper.ReturnResponse(c, fiber.StatusInternalServerError, "Failed to commit session", nil, err)
+			}
+			return helper.ReturnResponse(c, fiber.StatusOK, "success", map[string]any{"payload": payload, "qr_token": createPayload.QR}, nil)
 		}
 		/*
 			//* using worklow approval
@@ -214,7 +218,7 @@ func SetupLocationRoutes(app *fiber.App, version string) {
 		return helper.ReturnResponse(c, fiber.StatusOK, "success", map[string]any{"approval_uuid": payload.LocatoinUUID}, nil)
 	})
 
-	// active
+	// get active session
 	app.Get(baseURL+"/sessions/active", func(c fiber.Ctx) error {
 		schoolUUID, tenantUUID, _, err := helper.ValidateRequestHeader(c)
 		if err != nil {
@@ -223,10 +227,10 @@ func SetupLocationRoutes(app *fiber.App, version string) {
 
 		result, err := helper.GetActiveSession(schoolUUID, tenantUUID)
 		if err != nil {
-			if err.Error() != "no rows in result set" {
+			if errors.Is(err, pgx.ErrNoRows) {
 				return helper.ReturnResponse(c, fiber.StatusOK, "No active sessions found", nil, nil)
 			}
-			return helper.ReturnResponse(c, fiber.StatusBadRequest, "Failed to search users", nil, err)
+			return helper.ReturnResponse(c, fiber.StatusInternalServerError, "Failed to get active session", nil, err)
 		}
 		return helper.ReturnResponse(c, fiber.StatusOK, "success", result, nil)
 	})
