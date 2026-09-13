@@ -31,6 +31,8 @@ services:
       DATABASE_PASSWORD: ${DATABASE_PASSWORD}
       DATABASE_NAME: ${DATABASE_NAME}
       DATABASE_URL: ${DATABASE_URL}
+      ED25519_PRIVATE_KEY: ${ED25519_PRIVATE_KEY}
+      ED25519_PUBLIC_KEY: ${ED25519_PUBLIC_KEY}
     networks:
       gakuren-network:
         aliases:
